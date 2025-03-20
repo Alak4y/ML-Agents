@@ -4,209 +4,183 @@ using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
 using System;
 
-public class TurtleAgents : Agent
+public class ChickenAgent : Agent
 {
-    // Referências aos objetos no ambiente
-    [SerializeField] private Transform _goal; // Referência ao objetivo da tartaruga
-    [SerializeField] private Transform _car1; // Referência ao primeiro carro (obstáculo)
-    [SerializeField] private Transform _car2; // Referência ao segundo carro (obstáculo)
 
-    // Parâmetros de movimento
-    [SerializeField] private float _moveSpeed = 1.5f; // Velocidade de movimento
-    [SerializeField] private float _rotationSpeed = 180f; // Velocidade de rotação
+    [SerializeField] private Transform _goal;
+    [SerializeField] private float _moveSpeed = 1.5f;
+    [SerializeField] private float _rotationSpeed = 180f;
 
-    private Renderer _renderer; // Renderer do agente, usado para mudar a cor
-    private int _currentEpisode = 0; // Contador de episódios
-    private float _cumulativeReward = 0f; // Acumulador de recompensa
+    private Renderer _renderer;
 
-    // Inicializa as variáveis e configurações do agente
+    private int _currentEpisode = 0;
+    private float _cumulativeReward = 0f;
+
+
+    float _distance = 0;
+
     public override void Initialize()
     {
-        Debug.Log("Initialize()");
-        _renderer = GetComponent<Renderer>(); // Obtém o componente Renderer do agente
+        Debug.Log("Initialize");
+
+        _renderer = GetComponent<Renderer>();
         _currentEpisode = 0;
         _cumulativeReward = 0f;
+        
     }
 
-    // Método chamado no início de cada episódio
     public override void OnEpisodeBegin()
     {
-        Debug.Log("OnEpisodeBegin()");
+        Debug.Log("OnEpisodeBegin");
 
-        _currentEpisode++; // Incrementa o contador de episódios
-        _cumulativeReward = 0f; // Reseta a recompensa acumulada
-        _renderer.material.color = Color.white; // Define a cor inicial como branca
-
-        SpawnObjects(); // Posiciona os objetos no ambiente
+        _currentEpisode++;
+        _cumulativeReward = 0f;
+        _distance = 0f;
+        _renderer.material.color = Color.white;
+        SpawnObjects();
     }
 
-    // Método responsável por reposicionar o agente e o objetivo
-    private void SpawnObjects()
+    public void SpawnObjects()
     {
-        transform.localRotation = Quaternion.identity; // Define a rotação inicial
-        transform.localPosition = new Vector3(0f, 0.15f, 0f); // Define a posição inicial do agente
+        transform.localRotation = Quaternion.identity;
+        transform.localPosition = new Vector3(2.55f, 0f, 0f);
 
-        _goal.localPosition = new Vector3(-22.5f, 0.3f, 0f); // Define a posição fixa do objetivo
+        _goal.localPosition = new Vector3(-22.0f,0.25f,0f);
+        _distance = (float)(Math.Sqrt(Math.Pow((transform.localPosition.x - _goal.localPosition.x), 2)
+            + Math.Pow((transform.localPosition.z - _goal.localPosition.z), 2)));
     }
 
-    // Coleta informações sobre o ambiente para a IA
     public override void CollectObservations(VectorSensor sensor)
     {
-        // Normaliza as posições do objetivo e do agente para melhor aprendizado da IA
         float goalPosX_normalized = _goal.localPosition.x / 5f;
         float goalPosZ_normalized = _goal.localPosition.z / 5f;
-        float turtlePosX_normalized = transform.localPosition.x / 5f;
-        float turtlePosZ_normalized = transform.localPosition.z / 5f;
 
-        // Normaliza a rotação do agente
-        float turtleRotation_normalized = (transform.localRotation.eulerAngles.y / 360f) * 2f - 1f;
+        float chickenPosX_normalized = transform.localPosition.x / 5f;
+        float chickenPosZ_normalized = transform.localPosition.z / 5f;
 
-        // Calcula a distância entre a tartaruga e os carros
-        float car1PosX_distance = Math.Abs((_car1.localPosition.x / 5f) - turtlePosX_normalized);
-        float car1PosZ_distance = Math.Abs((_car1.localPosition.z / 5f) - turtlePosZ_normalized);
-        float car2PosX_distance = Math.Abs((_car2.localPosition.x / 5f) - turtlePosX_normalized);
-        float car2PosZ_distance = Math.Abs((_car2.localPosition.z / 5f) - turtlePosZ_normalized);
+        float chickenRotation_normalized = (transform.localRotation.eulerAngles.y / 360f) * 2f - 1f;
 
-        // Informa a posição dos carros
-        float car1PosX_LocalPosition = _car1.localPosition.x / 5f;
-        float car1PosZ_LocalPosition = _car1.localPosition.z / 5f;
-        float car2PosX_LocalPosition = _car2.localPosition.x / 5f;
-        float car2PosZ_LocalPosition = _car2.localPosition.z / 5f;
-
-        // Adiciona as informações ao sensor
         sensor.AddObservation(goalPosX_normalized);
         sensor.AddObservation(goalPosZ_normalized);
-        sensor.AddObservation(turtlePosX_normalized);
-        sensor.AddObservation(turtlePosZ_normalized);
-        sensor.AddObservation(turtleRotation_normalized);
-        sensor.AddObservation(car1PosX_distance);
-        sensor.AddObservation(car1PosZ_distance);
-        sensor.AddObservation(car2PosX_distance);
-        sensor.AddObservation(car2PosZ_distance);
-        sensor.AddObservation(car1PosZ_LocalPosition);
-        sensor.AddObservation(car1PosX_LocalPosition);
-        sensor.AddObservation(car2PosX_LocalPosition);
-        sensor.AddObservation(car2PosZ_distance);
+        sensor.AddObservation(chickenPosX_normalized);
+        sensor.AddObservation(chickenPosZ_normalized);
+        sensor.AddObservation(chickenRotation_normalized);
+
     }
 
-    // Método chamado quando a IA recebe uma ação do modelo de aprendizado
     public override void OnActionReceived(ActionBuffers actions)
     {
-        // Movimento do agente
         MoveAgent(actions.DiscreteActions);
 
-        // Penaliza levemente cada passo para incentivar o agente a ser eficiente
-        AddReward(-2f / MaxStep);
+        float x2 = transform.localPosition.x;
+        float x1 = _goal.localPosition.x;
+        float z2 = transform.localPosition.z;
+        float z1 = _goal.localPosition.z;
 
-        // Atualiza a recompensa acumulada
+        float newDistance = Mathf.Sqrt(Mathf.Pow((x2 - x1), 2) + Mathf.Pow((z2 - z1), 2));
+
+        float safeDistance = Mathf.Max(newDistance, 0.01f);
+        float rewardFactor = 1 / (safeDistance + 0.1f);
+
+        float distanceDelta = _distance - newDistance; 
+        if (distanceDelta > 0)
+        {
+            AddReward(0.05f * distanceDelta); 
+        }
+        else
+        {
+            AddReward(-0.02f * Mathf.Abs(distanceDelta)); 
+        }
+
+        if (actions.DiscreteActions[0] == 0)
+        {
+            AddReward(-0.01f);
+        }
+
+        AddReward(-0.001f);
+
+        _distance = newDistance;
+
         _cumulativeReward = GetCumulativeReward();
-
-        // Calcula a distância entre o agente e o objetivo
-        float distanceToGoal = Vector3.Distance(transform.localPosition, _goal.localPosition);
-
-        // Penaliza por cada passo (quanto maior o número de passos, maior a penalidade)
-        AddReward(-0.01f); // Penalidade constante por cada passo
-
-        // Recompensa por se aproximar do objetivo
-        AddReward(0.1f * distanceToGoal); // Quanto menor a distância, maior a recompensa (penaliza a distância maior)
-
-        // Ajuste adicional para incentivar o avanço em direção ao objetivo
-        // Aqui podemos oferecer uma recompensa por movimentos mais efetivos
-        if (distanceToGoal < 5f) // Se estiver muito próximo do objetivo, recompensa maior
-        {
-            AddReward(0.5f); // Recompensa adicional quando o agente estiver perto do objetivo
-        }
-        else if (distanceToGoal < 15f) // Se estiver razoavelmente próximo, recompensa moderada
-        {
-            AddReward(0.2f);
-        }
+        Debug.Log($"Current Episode: {_currentEpisode} Reward: {_cumulativeReward}");
     }
 
 
-    // Move o agente com base na ação escolhida
+
     public void MoveAgent(ActionSegment<int> act)
     {
         var action = act[0];
 
-        switch (action)
+        switch(action)
         {
             case 1:
-                transform.position += transform.forward * _moveSpeed * Time.deltaTime; // Move para frente
+                transform.position += transform.forward * _moveSpeed * Time.deltaTime;
                 break;
             case 2:
-                transform.Rotate(0f, -_rotationSpeed * Time.deltaTime, 0f); // Rotaciona para a esquerda
+                transform.Rotate(0f, -_rotationSpeed * Time.deltaTime, 0f);
                 break;
             case 3:
-                transform.Rotate(0f, _rotationSpeed * Time.deltaTime, 0f); // Rotaciona para a direita
+                transform.Rotate(0f, _rotationSpeed * Time.deltaTime, 0f);
                 break;
         }
     }
 
-    // Verifica se o agente atingiu o objetivo
     private void OnTriggerEnter(Collider other)
     {
-        if (other.gameObject.CompareTag("Goal"))
+        if(other.gameObject.CompareTag("Goal"))
         {
+            _renderer.material.color = Color.green;
             GoalReached();
         }
     }
 
-    // Concede uma recompensa ao agente por alcançar o objetivo
     private void GoalReached()
     {
-        AddReward(1.0f); // Recompensa positiva por atingir o objetivo
+        AddReward(1.0f);
         _cumulativeReward = GetCumulativeReward();
-        EndEpisode(); // Finaliza o episódio
+
+        EndEpisode();
+        Debug.Log($"Current Episode: {_currentEpisode} Reward:{_cumulativeReward}");
     }
 
-    // Penaliza o agente ao colidir com um obstáculo
     private void OnCollisionEnter(Collision collision)
     {
-        if (collision.gameObject.CompareTag("Wall"))
+        if(collision.gameObject.CompareTag("Wall"))
         {
-            AddReward(-0.02f); // Penalidade por colisão
-            if (_renderer != null)
-            {
-                _renderer.material.color = Color.red; // Muda a cor do agente para vermelho
-            }
-        }
-        if (collision.gameObject.CompareTag("Car"))
-        {
-            AddReward(-0.05f); // Penalidade por colisão
-            if (_renderer != null)
-            {
-                _renderer.material.color = Color.red; // Muda a cor do agente para vermelho
-                EndEpisode();
-            }
+            AddReward(-0.01f);
 
+            if(_renderer != null)
+            {
+                _renderer.material.color = Color.red;
+            }
         }
+
         if (collision.gameObject.CompareTag("Street"))
         {
-            AddReward(-0.005f); // Penalidade por colisão
+            AddReward(-0.01f);
+
             if (_renderer != null)
             {
-                _renderer.material.color = Color.yellow; // Muda a cor do agente para amarelo
+                _renderer.material.color = Color.yellow;
             }
         }
     }
 
-    // Penaliza o agente se ele permanecer colidindo com uma parede
     private void OnCollisionStay(Collision collision)
     {
         if (collision.gameObject.CompareTag("Wall") || collision.gameObject.CompareTag("Street"))
         {
-            AddReward(-0.01f * Time.fixedDeltaTime); // Penalidade contínua por permanecer encostado na parede
+            AddReward(-0.01f * Time.fixedDeltaTime);
         }
     }
 
-    // Restaura a cor do agente ao sair da colisão
     private void OnCollisionExit(Collision collision)
     {
-        if (collision.gameObject.CompareTag("Wall") || collision.gameObject.CompareTag("Street") || collision.gameObject.CompareTag("Car"))
+        if (collision.gameObject.CompareTag("Wall") || collision.gameObject.CompareTag("Street"))
         {
             if (_renderer != null)
             {
-                _renderer.material.color = Color.white; // Retorna à cor branca
+                _renderer.material.color = Color.white;
             }
         }
     }
